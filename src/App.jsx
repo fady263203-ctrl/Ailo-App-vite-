@@ -270,6 +270,49 @@ const XOGame=memo(function XOGame({g, userId, partner, darkMode, muted, aiValida
   );
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Global Components — defined OUTSIDE Ailo to prevent React Error #310
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Av: Avatar component — receives theme values as props
+function Av({src, size=40, primary, card, glow}){
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:size/2, overflow:"hidden",
+      flexShrink:0, border:`2px solid ${primary}`, background:card,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      boxShadow:`0 0 0 3px ${glow}`
+    }}>
+      {src?.startsWith("http")
+        ? <img src={src} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="" loading="lazy"/>
+        : <span style={{fontSize:size*0.55,lineHeight:1}}>{src}</span>
+      }
+    </div>
+  );
+}
+
+// TapText: tap-to-translate — receives theme + handler as props
+function TapText({text, style, primary, onWordTap}){
+  if(!text) return null;
+  const words = text.split(/(\s+)/);
+  return (
+    <span style={style}>
+      {words.map((w,i)=>{
+        const isWord = /\S/.test(w) && w.length > 1;
+        return isWord
+          ? <span key={i}
+              onClick={e => onWordTap && onWordTap(w.replace(/[^a-zA-Z\u0600-\u06FFa-zA-Z\u00C0-\u00FF]/g,""), e)}
+              style={{cursor:"pointer", borderBottom:"1px dashed rgba(99,102,241,0.3)", transition:"color 0.15s"}}
+              onMouseEnter={e => e.target.style.color = primary}
+              onMouseLeave={e => e.target.style.color = ""}
+            >{w}</span>
+          : <span key={i}>{w}</span>;
+      })}
+    </span>
+  );
+}
+
 function Ailo(){
   // ── load saved state from localStorage ──
   const load=(k,def)=>{ try{ const v=localStorage.getItem("ailo_"+k); return v!==null?JSON.parse(v):def; }catch(e){return def;} };
@@ -867,16 +910,7 @@ Reply ONLY with: VALID or INVALID:<short reason in Arabic>`;
     setTimeout(()=>setTapTooltip(null),3000);
   };
   // Helper: wrap text in clickable spans for tap-to-translate
-  const TapText=({text,style})=>{
-    if(!text) return null;
-    const words=text.split(/(\s+)/);
-    return <span style={style}>{words.map((w,i)=>{
-      const isWord=/\S/.test(w)&&w.length>1;
-      return isWord
-        ?<span key={i} onClick={e=>handleWordTap(w.replace(/[^a-zA-Z؀-ۿa-zA-ZÀ-ÿ]/g,""),e)} style={{cursor:"pointer",borderBottom:"1px dashed rgba(99,102,241,0.3)",transition:"color 0.15s"}} onMouseEnter={e=>e.target.style.color=primary} onMouseLeave={e=>e.target.style.color=""}>{w}</span>
-        :<span key={i}>{w}</span>;
-    })}</span>;
-  };
+  // TapText → moved to global scope (see above Ailo)
   // states for arrange type
   const[exArrWords,setExArrWords]=useState([]);
   const[exArrSel,setExArrSel]=useState([]);
@@ -2498,7 +2532,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
   const now=()=>new Date().toLocaleTimeString("ar",{hour:"2-digit",minute:"2-digit"});
 
-  const Av=({src,size=40})=>(<div style={{width:size,height:size,borderRadius:size/2,overflow:"hidden",flexShrink:0,border:`2px solid ${primary}`,background:card,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 0 3px ${glow}`}}>{src?.startsWith("http")?<img src={src} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="" loading="lazy"/>:<span style={{fontSize:size*0.55,lineHeight:1}}>{src}</span>}</div>);
+  // Av → moved to global scope (see above Ailo)
 
   const CSS=`
     @keyframes fadeUp{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -3174,7 +3208,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
         }}>
           <button onClick={()=>setScreen("home")} style={{background:"none",border:"none",cursor:"pointer",padding:6}}>{Ic.back(muted)}</button>
           <button onClick={()=>setShowPartnerR(true)} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:10,flex:1}}>
-            <Av src={partner.av} size={36}/>
+            <Av src={partner.av} size={36}/ primary={primary} card={card} glow={glow}>
             <div style={{flex:1,textAlign:"right"}}>
               <div style={{fontWeight:800,fontSize:15}}>{partner.name}</div>
               <div style={{fontSize:11,color:isTyping?"#22c55e":muted,display:"flex",alignItems:"center",gap:4}}>
@@ -3619,7 +3653,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
             ? <button onClick={()=>setTab("home")} style={{background:"none",border:"none",cursor:"pointer",padding:"6px",display:"flex",alignItems:"center",gap:4,color:muted}}>
                 {Ic.back(muted,20)}
               </button>
-            : <button onClick={()=>setShowProfileView(true)} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><Av src={profile.avatar} size={40}/></button>
+            : <button onClick={()=>setShowProfileView(true)} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><Av src={profile.avatar} size={40}/ primary={primary} card={card} glow={glow}></button>
           }
           <div style={{
             fontWeight:900,fontSize:20,letterSpacing:0.5,
@@ -3716,7 +3750,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
             <div style={{display:"flex",alignItems:"center",gap:14}}>
               <div style={{position:"relative"}}>
                 <div style={{width:58,height:58,borderRadius:29,padding:2,background:`linear-gradient(135deg,${primary},${secondary})`,boxShadow:`0 0 20px ${glow}`}}>
-                  <Av src={profile.avatar} size={54}/>
+                  <Av src={profile.avatar} size={54}/ primary={primary} card={card} glow={glow}>
                 </div>
                 <div style={{position:"absolute",bottom:0,right:0,width:14,height:14,borderRadius:7,background:"#22c55e",border:`2px solid ${darkMode?"#0b1120":"white"}`,boxShadow:"0 0 8px rgba(34,197,94,0.5)"}}/>
               </div>
@@ -5372,7 +5406,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
 
                   {/* ── MCQ ── */}
                   {(!q.type||q.type==="mcq")&&<>
-                    <div style={{color:muted,fontSize:12,marginBottom:8,textAlign:"center"}}><TapText text={q.q} style={{color:muted,fontSize:12}}/></div>
+                    <div style={{color:muted,fontSize:12,marginBottom:8,textAlign:"center"}}><TapText text={q.q} style={{color:muted,fontSize:12}}/ primary={primary} onWordTap={handleWordTap}></div>
                     <div style={{fontWeight:900,fontSize:30,background:`linear-gradient(135deg,${primary},${accent})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:20,textAlign:"center",cursor:"pointer"}} onClick={e=>handleWordTap(q.word,e)}>{q.word}</div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                       {q.options?.map((o,i)=>{
