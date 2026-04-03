@@ -20,9 +20,8 @@
       await OneSignal.init({
         appId: "0f14f7db-8b55-42ec-b0db-f8cf41229ac2",
         notifyButton: { enable: false },
-        path: "/Ailo/",
-          serviceWorkerParam: { scope: "/Ailo/" },
-        serviceWorkerPath: "Ailo/OneSignalSDKWorker.js",
+        serviceWorkerParam: { scope: "/Ailo/" },
+        serviceWorkerPath: "/Ailo/OneSignalSDKWorker.js",
         promptOptions: {
           slidedown: {
             prompts: [{
@@ -462,17 +461,190 @@ const XOGame=React.memo(function XOGame({g, userId, partner, darkMode, muted, ai
   );
 });
 
+// ── Av: مكوّن مستقل خارج Ailo لتجنب React Error #310 ──
+function Av({src,size=40,primary,card,glow}){
+  return(<div style={{width:size,height:size,borderRadius:size/2,overflow:"hidden",flexShrink:0,border:`2px solid ${primary||"#6366f1"}`,background:card||"rgba(21,31,51,0.95)",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 0 3px ${glow||"rgba(99,102,241,0.25)"}`}}>{src?.startsWith("http")?<img src={src} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="" loading="lazy"/>:<span style={{fontSize:size*0.55,lineHeight:1}}>{src}</span>}</div>);
+}
 
-// ── TapText: مكوّن مستقل خارج Ailo لتفادي React Error #310 ──
-function TapText({text, style, onWordTap, primary}){
+// ── TapText: مكوّن مستقل خارج Ailo لتجنب React Error #310 ──
+function TapText({text,style,onWordTap,primary}){
   if(!text) return null;
   const words=text.split(/(\s+)/);
-  return <span style={style}>{words.map((w,i)=>{
+  return React.createElement('span',{style},words.map((w,i)=>{
     const isWord=/\S/.test(w)&&w.length>1;
     return isWord
-      ?<span key={i} onClick={e=>onWordTap&&onWordTap(w.replace(/[^a-zA-Z؀-ۿa-zA-ZÀ-ÿ]/g,""),e)} style={{cursor:"pointer",borderBottom:"1px dashed rgba(99,102,241,0.3)",transition:"color 0.15s"}} onMouseEnter={e=>e.target.style.color=primary} onMouseLeave={e=>e.target.style.color=""}>{w}</span>
-      :<span key={i}>{w}</span>;
-  })}</span>;
+      ?React.createElement('span',{key:i,onClick:e=>onWordTap&&onWordTap(w.replace(/[^a-zA-Z\u0600-\u06FFa-zA-Z\u00C0-\u00FF]/g,""),e),style:{cursor:"pointer",borderBottom:"1px dashed rgba(99,102,241,0.3)",transition:"color 0.15s"},onMouseEnter:e=>e.target.style.color=primary||"#6366f1",onMouseLeave:e=>e.target.style.color=""},w)
+      :React.createElement('span',{key:i},w);
+  }));
+}
+
+// ── CommunityQuestion: مكوّن مستقل لتجنب React.useState داخل JSX (Error #310) ──
+function CommunityQuestion({primary,border,muted,text,darkMode,btnP,glass,getSupa,userId,addXp}){
+  const[showCQ,setShowCQ]=React.useState(false);
+  const[cqForm,setCqForm]=React.useState({lang:"English",topic:"travel",qtype:"mcq",question:"",options:"",answer:"0",translation:""});
+  const[cqSending,setCqSending]=React.useState(false);
+  const[cqDone,setCqDone]=React.useState(false);
+  return(<>
+    <button onClick={()=>setShowCQ(true)} style={{...glass({width:"100%",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginTop:4,border:`1px solid ${primary}30`,background:`${primary}08`})}}>
+      <span style={{fontSize:20}}>✏️</span>
+      <div style={{flex:1,textAlign:"right"}}>
+        <div style={{fontWeight:700,fontSize:13}}>ساهم بسؤال</div>
+        <div style={{color:muted,fontSize:11,marginTop:2}}>أضف سؤالاً لمساعدة المتعلمين الآخرين</div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+    {showCQ&&(
+      <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",zIndex:200,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowCQ(false)}>
+        <div style={{...glass({width:"100%",borderRadius:"24px 24px 0 0",padding:22,maxHeight:"80vh",overflowY:"auto"})}} onClick={e=>e.stopPropagation()}>
+          <div style={{fontWeight:900,fontSize:16,marginBottom:16,color:primary}}>✏️ أضف سؤالاً جديداً</div>
+          {cqDone?(
+            <div style={{textAlign:"center",padding:"20px 0"}}>
+              <div style={{fontSize:48,marginBottom:12}}>✅</div>
+              <div style={{fontWeight:800,fontSize:16,marginBottom:8}}>شكراً على مساهمتك!</div>
+              <div style={{color:muted,fontSize:13}}>سيُراجع السؤال ويُضاف للتطبيق قريباً</div>
+              <button onClick={()=>{setShowCQ(false);setCqDone(false);}} style={btnP({marginTop:16,padding:"12px 28px"})}>إغلاق</button>
+            </div>
+          ):(
+            <>
+              {[
+                {label:"اللغة",field:"lang",type:"select",options:["English","Arabic","French","Spanish","German","Chinese","Japanese","Turkish"]},
+                {label:"الموضوع",field:"topic",type:"select",options:["travel","food","music","school","work","family","sports","shopping","health","technology","nature","daily"]},
+                {label:"نوع السؤال",field:"qtype",type:"select",options:["mcq","flashcard","cloze","arrange","speech"]},
+                {label:"السؤال / الكلمة",field:"question",type:"text",placeholder:"مثال: What is the meaning of 'Hello'?"},
+                {label:"الخيارات (مفصولة بفاصلة)",field:"options",type:"text",placeholder:"مرحبا, وداعا, شكرا, آسف"},
+                {label:"رقم الإجابة الصحيحة (0-3)",field:"answer",type:"text",placeholder:"0"},
+                {label:"الترجمة / المعنى",field:"translation",type:"text",placeholder:"مرحباً"},
+              ].map(f=>(
+                <div key={f.field} style={{marginBottom:12}}>
+                  <div style={{fontSize:12,color:muted,marginBottom:4,fontWeight:600}}>{f.label}</div>
+                  {f.type==="select"?(
+                    <select value={cqForm[f.field]} onChange={e=>setCqForm(p=>({...p,[f.field]:e.target.value}))}
+                      style={{width:"100%",padding:"10px 12px",borderRadius:10,background:darkMode?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.04)",border:`1px solid ${border}`,color:text,fontSize:13,outline:"none",fontFamily:"'Poppins','Tajawal',system-ui"}}>
+                      {f.options.map(o=><option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ):(
+                    <input value={cqForm[f.field]} onChange={e=>setCqForm(p=>({...p,[f.field]:e.target.value}))}
+                      placeholder={f.placeholder} style={{width:"100%",padding:"10px 12px",borderRadius:10,background:darkMode?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.04)",border:`1px solid ${border}`,color:text,fontSize:13,outline:"none",fontFamily:"'Poppins','Tajawal',system-ui"}}/>
+                  )}
+                </div>
+              ))}
+              <button onClick={async()=>{
+                if(!cqForm.question.trim()){alert("اكتب السؤال أولاً");return;}
+                setCqSending(true);
+                try{
+                  const supa=getSupa();
+                  if(supa){
+                    await supa.from("pending_questions").insert({
+                      language:cqForm.lang,category:cqForm.topic,type:cqForm.qtype,
+                      question_text:cqForm.question,options_text:cqForm.options,
+                      correct_answer:parseInt(cqForm.answer)||0,
+                      translation:cqForm.translation,
+                      submitted_by:userId||"anonymous",
+                      status:"pending",
+                      created_at:new Date().toISOString()
+                    });
+                    setCqDone(true);
+                    addXp(10,"مساهمة مجتمعية");
+                  }
+                }catch(e){ alert("حدث خطأ، حاول مجدداً"); }
+                setCqSending(false);
+              }} style={btnP({width:"100%",opacity:cqSending?0.7:1})}>
+                {cqSending?"جاري الإرسال...":"إرسال السؤال 📤"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    )}
+  </>);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// GOAL 1 ── TextNormalizer
+// يُنظّف النصوص للمقارنة الآمنة:
+//   • toLowerCase لجميع اللغات
+//   • إزالة علامات الترقيم العربية والإنجليزية
+//   • ضغط المسافات المتعددة لمسافة واحدة
+//   • trim() من الطرفين
+// ════════════════════════════════════════════════════════════════════════
+const TextNormalizer = {
+  clean(text, language = 'en') {
+    if (!text) return "";
+    return text.toLocaleLowerCase(language)
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()؟،]/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+};
+
+// ════════════════════════════════════════════════════════════════════════
+// GOAL 2 ── WordBankState
+// يُدير حالة بنك الكلمات بـ IDs فريدة لكل رمز (token)، مما يحل:
+//   • مشكلة الكلمات المكررة (key متطابق في React)
+//   • اضطراب الـ DOM عند استخدام index كـ key
+//   • عدم استقرار الترتيب العشوائي عند إعادة الـ render
+// ════════════════════════════════════════════════════════════════════════
+class WordBankState {
+  constructor(wordsArray) {
+    // خطوة 1: نُعيّن لكل كلمة ID فريداً يجمع الوقت + الـ index + عشوائية
+    this.tokens = (wordsArray || []).map((word, index) => ({
+      id: `tok_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 7)}`,
+      word: word,
+      isSelected: false
+    }));
+    // خطوة 2: نخلط الترتيب عشوائياً بخوارزمية Fisher-Yates الآمنة
+    for (let i = this.tokens.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.tokens[i], this.tokens[j]] = [this.tokens[j], this.tokens[i]];
+    }
+    // قائمة IDs المختارة بالترتيب (تمثّل منطقة الإجابة)
+    this.selectedIds = [];
+  }
+
+  // نسخة immutable من الحالة الحالية — ضرورية لـ React setState
+  clone() {
+    const copy = Object.create(WordBankState.prototype);
+    copy.tokens = this.tokens.map(t => ({ ...t }));
+    copy.selectedIds = [...this.selectedIds];
+    return copy;
+  }
+
+  // تبديل حالة token:
+  //   • إذا كان مختاراً → أُزيله من منطقة الإجابة وأُعيده للبنك
+  //   • إذا كان في البنك → أُضيفه لنهاية منطقة الإجابة
+  toggleToken(tokenId) {
+    const copy = this.clone();
+    const token = copy.tokens.find(t => t.id === tokenId);
+    if (!token) return copy;
+    if (token.isSelected) {
+      token.isSelected = false;
+      copy.selectedIds = copy.selectedIds.filter(id => id !== tokenId);
+    } else {
+      token.isSelected = true;
+      copy.selectedIds = [...copy.selectedIds, tokenId];
+    }
+    return copy;
+  }
+
+  // يبني نص الإجابة من الكلمات المختارة بترتيبها الصحيح
+  getConstructedAnswer() {
+    return this.selectedIds
+      .map(id => this.tokens.find(t => t.id === id)?.word || "")
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  // الكلمات المتبقية في البنك (غير المختارة)
+  get bankTokens() {
+    return this.tokens.filter(t => !t.isSelected);
+  }
+
+  // الكلمات المختارة مرتبة حسب ترتيب الاختيار
+  get answerTokens() {
+    return this.selectedIds
+      .map(id => this.tokens.find(t => t.id === id))
+      .filter(Boolean);
+  }
 }
 
 function Ailo(){
@@ -590,30 +762,55 @@ Return ONLY a JSON array of 3 strings, no other text. Example:
     };
   };
 
+  // ── Gemini — عبر ailo-gemini Edge Function ──
   const adminCallGemini = async (prompt) => {
-    const token = localStorage.getItem("ailo_token")||"";
     const res = await fetch(`${SUPA_URL}/functions/v1/ailo-gemini`, {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
         "apikey": SUPA_KEY,
-        "Authorization": `Bearer ${token}`
+        "Authorization": `Bearer ${SUPA_KEY}`
       },
-      body: JSON.stringify({ prompt })
+      body: JSON.stringify({ message: prompt })
     });
-    if(!res.ok) throw new Error(`Edge Function error: ${res.status}`);
-    // استخدم parseAiReply للفك الصحيح بدلاً من data.reply مباشرة
+    if(!res.ok){
+      const err = await res.text().catch(()=>"");
+      throw new Error(`Gemini Edge Function error: ${res.status} — ${err.slice(0,100)}`);
+    }
     const parsed = await parseAiReply(res);
     return parsed.text || parsed.reply || "";
   };
 
+  // ── Groq (LPU) — عبر Supabase Edge Function (JWT disabled — apikey فقط) ──
+  const adminCallGroq = async (prompt) => {
+    const res = await fetch(`${SUPA_URL}/functions/v1/ailo-groq`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPA_KEY
+      },
+      body: JSON.stringify({ prompt })
+    });
+    if(!res.ok){
+      const err = await res.text().catch(()=>"");
+      throw new Error(`Groq Edge Function error: ${res.status} — ${err.slice(0,200)}`);
+    }
+    const data = await res.json();
+    if(data?.error) throw new Error(data.error);
+    return data?.text || data?.reply || "";
+  };
+
+  // ── Unified caller ──
+  const adminCallAI = (prompt) =>
+    adminAiProvider==="groq" ? adminCallGroq(prompt) : adminCallGemini(prompt);
+
   const adminGenerateQuestions = async () => {
     setAdminGenLoading(true);
-    setAdminGenLog(["⏳ جارٍ توليد الأسئلة من Gemini..."]);
+    setAdminGenLog([`⏳ جارٍ توليد الأسئلة عبر ${adminAiProvider==="groq"?"Groq ⚡":"Gemini 🔮"}...`]);
     const supa = getSupa();
     if(!supa){ setAdminGenLog(["❌ Supabase غير متصل"]); setAdminGenLoading(false); return; }
     let totalInserted = 0;
-    const BATCH = 30; // 30 سؤال في كل استدعاء → 5 دفعات = 150
+    const BATCH = 30;
     const CATEGORIES = ["Vocabulary","Grammar","Phrases","Travel","Culture"];
     try{
       for(let ci=0; ci<CATEGORIES.length; ci++){
@@ -631,14 +828,13 @@ Return ONLY a valid JSON array. Each object must have these exact keys:
 - "level": integer 1-3
 
 No markdown, no explanation, no backticks. Start directly with [`;
-        const raw = await adminCallGemini(prompt);
+        const raw = await adminCallAI(prompt);
         const match = raw.match(/\[[\s\S]*\]/);
         if(!match){ setAdminGenLog(p=>[...p,`⚠️ ${cat}: لم يُرجع JSON صحيح`]); continue; }
         let questions;
         try{ questions = JSON.parse(match[0]); }
         catch(e){ setAdminGenLog(p=>[...p,`⚠️ ${cat}: خطأ في تحليل JSON`]); continue; }
         if(!Array.isArray(questions)||questions.length===0){ setAdminGenLog(p=>[...p,`⚠️ ${cat}: مصفوفة فارغة`]); continue; }
-        // batch upsert
         const rows = questions.slice(0,BATCH).map(q=>({
           language: adminGenLang,
           category: cat,
@@ -646,7 +842,7 @@ No markdown, no explanation, no backticks. Start directly with [`;
           level: q.level||1,
           question_data: JSON.stringify(q)
         }));
-        const { error, count } = await supa.from("static_questions").insert(rows);
+        const { error } = await supa.from("static_questions").insert(rows);
         if(error){ setAdminGenLog(p=>[...p,`❌ ${cat}: خطأ DB — ${error.message}`]); continue; }
         totalInserted += rows.length;
         setAdminGenLog(p=>[...p,`✅ ${cat}: أُضيف ${rows.length} سؤال (الإجمالي: ${totalInserted})`]);
@@ -661,31 +857,33 @@ No markdown, no explanation, no backticks. Start directly with [`;
   const adminGenerateStickers = async (packType) => {
     setAdminGenLoading(true);
     const packName = packType==="movies" ? "English Movies 🎬" : packType==="status" ? "Status Expressions 😊" : "Arabic Wisdom 🌙";
-    setAdminGenLog([`⏳ جارٍ توليد ستيكرات حزمة "${packName}"...`]);
+    setAdminGenLog([`⏳ جارٍ توليد ستيكرات "${packName}" عبر ${adminAiProvider==="groq"?"Groq ⚡":"Gemini 🔮"}...`]);
     const supa = getSupa();
     if(!supa){ setAdminGenLog(["❌ Supabase غير متصل"]); setAdminGenLoading(false); return; }
     try{
       const prompt = packType==="status"
         ? `Generate 40 short expressive status stickers (like "I'm excited", "I need help", "Thinking...", "On my way", "Be right back").
 Mix Arabic and English. Each sticker max 60 chars with a relevant emoji.
-Return ONLY a JSON array like: [{"text":"🚀 I'm on my way!","trigger_emoji":"🚀"},...]`
+Return ONLY a valid JSON array, no markdown. Each object:
+- "text": the sticker text (max 60 chars)
+- "trigger_emoji": a single relevant emoji
+- "pack_name": "Status Expressions 😊"
+Example: [{"text":"🚀 I'm on my way!","trigger_emoji":"🚀","pack_name":"Status Expressions 😊"}]`
         : packType==="movies"
         ? `Generate 40 fun sticker messages inspired by famous English movies (quotes, reactions, emotions).
-Each sticker must have a matching trigger emoji.
 Return ONLY a valid JSON array, no markdown. Each object:
-- "text": the sticker message (short, max 60 chars, in English or mixed)
-- "trigger_emoji": a single relevant emoji that triggers this sticker
+- "text": the sticker message (short, max 60 chars)
+- "trigger_emoji": a single relevant emoji
 - "pack_name": "English Movies 🎬"
 Example: [{"text":"May the Force be with you ⚡","trigger_emoji":"⚡","pack_name":"English Movies 🎬"}]`
         : `Generate 40 beautiful Arabic wisdom stickers (حكم، أمثال، عبارات تحفيزية).
-كل ستيكر يجب أن يرتبط بإيموجي محدد يُشغّله.
 Return ONLY a valid JSON array, no markdown. Each object:
 - "text": the Arabic wisdom text (max 80 chars)
 - "trigger_emoji": a single relevant emoji
 - "pack_name": "Arabic Wisdom 🌙"
-مثال: [{"text":"من صبر نال ما أراد 🌹","trigger_emoji":"🌹","pack_name":"Arabic Wisdom 🌙"}]`;
+Example: [{"text":"من صبر نال ما أراد 🌹","trigger_emoji":"🌹","pack_name":"Arabic Wisdom 🌙"}]`;
 
-      const raw = await adminCallGemini(prompt);
+      const raw = await adminCallAI(prompt);
       const match = raw.match(/\[[\s\S]*\]/);
       if(!match){ setAdminGenLog(["❌ لم يُرجع JSON صحيح"]); setAdminGenLoading(false); return; }
       let stickers;
@@ -698,7 +896,7 @@ Return ONLY a valid JSON array, no markdown. Each object:
         pack_name: s.pack_name||packName,
         category: packType
       }));
-      // Fix #15: منع تكرار الستيكرات — جلب النصوص الموجودة مسبقاً
+      // منع التكرار
       const existingTexts = new Set();
       try{
         const { data: existing } = await supa.from("stickers").select("text").eq("pack_name", packName);
@@ -707,63 +905,11 @@ Return ONLY a valid JSON array, no markdown. Each object:
       const uniqueRows = rows.filter(r => r.text && !existingTexts.has(r.text));
       if(uniqueRows.length===0){ setAdminGenLog(["⚠️ جميع الستيكرات موجودة مسبقاً"]); setAdminGenLoading(false); return; }
       const { error } = await supa.from("stickers").insert(uniqueRows);
-
       if(error){ setAdminGenLog([`❌ خطأ DB: ${error.message}`]); setAdminGenLoading(false); return; }
-      setAdminGenLog([`🎉 أُضيف ${uniqueRows.length} ستيكر جديد في حزمة "${packName}" (تخطّى ${rows.length-uniqueRows.length} مكرر)`]);
+      setAdminGenLog([`🎉 أُضيف ${uniqueRows.length} ستيكر في "${packName}" (تخطّى ${rows.length-uniqueRows.length} مكرر)`]);
     }catch(e){
       setAdminGenLog([`❌ خطأ عام: ${e.message}`]);
     }
-    setAdminGenLoading(false);
-  };
-
-
-  // ── Gemini → سؤال تدريبي → static_questions ──────────────────────────────
-  const adminGenerateOneQuestion = async () => {
-    setAdminGenLoading(true);
-    setAdminGenLog(["⏳ جارٍ توليد سؤال من Gemini..."]);
-    const supa = getSupa();
-    if(!supa){ setAdminGenLog(["❌ Supabase غير متصل"]); setAdminGenLoading(false); return; }
-    try{
-      const prompt = `Generate 1 unique language learning question for ${adminGenLang}. Return ONLY JSON (no markdown):
-{"type":"mcq","word":"<word>","q":"<question in Arabic>","options":["a","b","c","d"],"answer":0,"meaning":"<Arabic meaning>","level":1}`;
-      const raw = await adminCallGemini(prompt);
-      const match = raw.match(/\{[\s\S]*\}/);
-      if(!match){ setAdminGenLog(["❌ JSON غير صالح"]); setAdminGenLoading(false); return; }
-      const q = JSON.parse(match[0]);
-      const { error } = await supa.from("static_questions").insert([{
-        language: adminGenLang, category: "Vocabulary",
-        type: q.type||"mcq", level: q.level||1,
-        question_data: JSON.stringify(q)
-      }]);
-      setAdminGenLog(error ? [`❌ ${error.message}`] : [`✅ سؤال أُضيف: "${q.word}"`]);
-    }catch(e){ setAdminGenLog([`❌ ${e.message}`]); }
-    setAdminGenLoading(false);
-  };
-
-  // ── Gemini → ستيكر → stickers + messages ─────────────────────────────────
-  const adminGenerateMessageSticker = async () => {
-    setAdminGenLoading(true);
-    setAdminGenLog(["⏳ جارٍ توليد ستيكر من Gemini..."]);
-    const supa = getSupa();
-    if(!supa){ setAdminGenLog(["❌ Supabase غير متصل"]); setAdminGenLoading(false); return; }
-    try{
-      const prompt = `Generate ONE fun chat sticker (max 80 chars + emoji) for a language learning app. Return ONLY JSON:
-{"text":"<sticker with emoji>","pack_name":"AI Generated ✨","trigger_emoji":"<emoji>"}`;
-      const raw = await adminCallGemini(prompt);
-      const match = raw.match(/\{[\s\S]*\}/);
-      if(!match){ setAdminGenLog(["❌ JSON غير صالح"]); setAdminGenLoading(false); return; }
-      const s = JSON.parse(match[0]);
-      const { error: sErr } = await supa.from("stickers").insert([{
-        text:s.text||"", trigger_emoji:s.trigger_emoji||"✨",
-        pack_name:s.pack_name||"AI Generated ✨", category:"ai_generated"
-      }]);
-      const { error: mErr } = await supa.from("messages").insert([{
-        room_id:"sticker_broadcast", user_id:userId||"system",
-        text:s.text||"", type:"sticker", created_at:new Date().toISOString()
-      }]);
-      const errs=[sErr,mErr].filter(Boolean).map(e=>e.message).join(" | ");
-      setAdminGenLog(errs ? [`⚠️ ${errs}`] : [`🎉 ستيكر: ${s.text}`]);
-    }catch(e){ setAdminGenLog([`❌ ${e.message}`]); }
     setAdminGenLoading(false);
   };
 
@@ -1072,10 +1218,15 @@ Reply ONLY with: VALID or INVALID:<short reason in Arabic>`;
     setTimeout(()=>setTapTooltip(null),3000);
   };
   // Helper: wrap text in clickable spans for tap-to-translate
-  // TapText moved outside Ailo — defined below, receives primary as prop
-  // states for arrange type
+
+  // states for arrange type (kept for non-arrange types that might read them)
   const[exArrWords,setExArrWords]=useState([]);
   const[exArrSel,setExArrSel]=useState([]);
+  // ── GOAL 2: wbState يحمل كائن WordBankState الحالي لأسئلة "arrange" ──
+  // يُعاد بناؤه في كل سؤال جديد عبر useEffect أدناه
+  const[wbState,setWbState]=useState(null);
+  // ── GOAL 3: مؤشر التحميل أثناء استدعاء Edge Function grade-answer ──
+  const[wbGrading,setWbGrading]=useState(false);
   // states for pair matching
   const[exPairSel,setExPairSel]=useState(null);
   const[exPairDone,setExPairDone]=useState({});
@@ -1228,6 +1379,7 @@ Reply ONLY with: VALID or INVALID:<short reason in Arabic>`;
     setExLoading(true); setExQuestions([]); setExIdx(0); setExAnswer(null); setExScore(0);
     setExArrWords([]); setExArrSel([]); setExPairSel(null); setExPairDone({});
     setExClozeInput(""); setExCardFlipped(false);
+    setWbState(null); setWbGrading(false); // ── إعادة تعيين حالة بنك الكلمات ──
     setSessionErrors([]); setCooldownQ([]); setCooldownIdx(0); setCooldownAns(null);
 
     // ════════════════════════════════════════════════════
@@ -1460,31 +1612,6 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
     }catch(e){}
   },[]);
 
-
-  // ── FIX: تجديد Supabase Session تلقائياً ──────────────────────────────────
-  useEffect(()=>{
-    const supa = getSupa(); if(!supa) return;
-    const { data: { subscription } } = supa.auth.onAuthStateChange((event, session) => {
-      if(event === "SIGNED_OUT" || event === "TOKEN_REFRESHED"){
-        if(session?.access_token){
-          try{ localStorage.setItem("ailo_token", session.access_token); }catch(e){}
-        }
-      }
-      if(event === "SIGNED_OUT" && !session){
-        // إعادة تسجيل الدخول بصمت إذا كان الجلسة منتهية
-        const savedToken = localStorage.getItem("ailo_token");
-        if(!savedToken){ setAppScreen("splash"); }
-      }
-    });
-    // تجديد فوري عند بدء التطبيق
-    supa.auth.getSession().then(({ data: { session } }) => {
-      if(session?.access_token){
-        try{ localStorage.setItem("ailo_token", session.access_token); }catch(e){}
-      }
-    }).catch(()=>{});
-    return () => subscription.unsubscribe();
-  }, []);
-
   // ── Notifications system ──
   const[notifications,setNotifications]=useState(()=>load("notifications",[]));
   useEffect(()=>{ save("notifications", notifications); },[notifications]);
@@ -1561,6 +1688,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
   const[adminGenLang,setAdminGenLang]=useState("English");
   const[adminGenLoading,setAdminGenLoading]=useState(false);
   const[adminGenLog,setAdminGenLog]=useState([]);
+  const[adminAiProvider,setAdminAiProvider]=useState("groq"); // "gemini"|"groq"
   const isOwner = shortId===OWNER_SHORT_ID;
 
   // Supabase realtime
@@ -2143,7 +2271,6 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
     const ch = supa.channel(cid);
     ch.on("broadcast",{event:"direct_msg"},async({payload})=>{
       if(payload.from===myId) return;
-      // Fix #6 & #19: أضف الرسالة مباشرة بدون fetchMessages لمنع الوميض
       const newMsg = {
         id: payload.id || "msg_"+Date.now()+"_"+Math.random().toString(36).slice(2,5),
         text: payload.text || "",
@@ -2152,7 +2279,9 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
         attachments: payload.fileUrl
           ? [{ type: payload.type||"image", image_url: payload.fileUrl, asset_url: payload.fileUrl }]
           : [],
-        readBy: [], _status: "delivered"
+        readBy: [], _status: "delivered",
+        // ✅ الرد يظهر للطرف المستلم
+        _replyTo: payload._replyTo||null
       };
       setStreamMessages(prev => [...prev, newMsg]);
       const txt = payload.text||"";
@@ -2217,49 +2346,61 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
       const timeStr = new Date().toISOString();
       const partnerId = partner._uid||"";
       const cid = "direct_"+[userId,partnerId].sort().join("__").replace(/[^a-zA-Z0-9_]/g,"").slice(0,60);
+      // ✅ حفظ قيمة الرد قبل إعادة الضبط
+      const replyToText = replyTo?.text||null;
+      const replyToId   = replyTo?.id||null;
 
       let fileUrl = null;
       let msgType = "text";
 
       if(imageData){
         msgType = "image";
-        // Fix #12: ضغط الصورة قبل الرفع
         const compressed = await compressImage(imageData, 800, 0.7);
         const blob = await fetch(compressed).then(r=>r.blob());
         fileUrl = await uploadToStorage(blob, "photo.jpg", "image/jpeg");
         if(!fileUrl){ alert("Failed to upload image"); return false; }
       }
 
-      // عرض محلي فوري — status="sent" (✓ رمادي)
+      // عرض محلي فوري — status="sent"
       const localMsg = {
         id: msgId, text: text||"", user:{ id:userId },
         created_at: timeStr,
         attachments: fileUrl?[{type:msgType,image_url:fileUrl,asset_url:fileUrl}]:[],
-        readBy:[], _status:"sent"
+        readBy:[], _status:"sent",
+        // ✅ الرد يظهر محلياً فوراً
+        _replyTo: replyToText||null
       };
       setStreamMessages(prev=>[...prev,localMsg]);
+      // ✅ مسح شريط الرد فوراً
+      setReplyTo(null);
 
       // حفظ في Database
       await saveMessageToDB({
         id: msgId, room_id: cid, user_id: userId,
         text: text||"", type: msgType, file_url: fileUrl,
-        reply_to: replyTo?.text||null, created_at: timeStr
+        reply_to: replyToText, created_at: timeStr
       });
 
-      // Fix #19: إشعار فوري للطرف الثاني مع رابط الملف
+      // ✅ إرسال _replyTo في الـ payload للطرف الآخر
       await directChanRef.current.send({
         type:"broadcast", event:"direct_msg",
-        payload:{ id:msgId, text:text||(fileUrl?msgType==="image"?"📷 صورة":"🎙️ صوت":""), from:userId, rid:roomId, fileUrl:fileUrl||null, type:msgType }
+        payload:{
+          id: msgId,
+          text: text||(fileUrl?msgType==="image"?"📷 صورة":"🎙️ صوت":""),
+          from: userId,
+          rid: roomId,
+          fileUrl: fileUrl||null,
+          type: msgType,
+          _replyTo: replyToText||null
+        }
       });
 
-      // بعد إرسال ناجح → upgrade إلى delivered (✓✓ رمادي)
       setTimeout(()=>{
         setStreamMessages(prev=>prev.map(mm=>
           mm.id===msgId ? {...mm,_status:"delivered"} : mm
         ));
       }, 800);
 
-      // تحديث قائمة المحادثات
       const txt = text||(fileUrl?"📷 Photo":"");
       setConversations(prev=>{
         const updated=prev.map(c=>
@@ -2475,7 +2616,19 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
   },[streamMessages]);
   useEffect(()=>{botEnd.current?.scrollIntoView({behavior:"smooth"});},[botMsgs,botTyping]);
   useEffect(()=>{if(partner.name!=="Alex")save("last_partner",partner);},[partner]);
-  useEffect(()=>{ const q=exQuestions[exIdx]; if(q&&q.type==='arrange'&&q.words){setExArrWords([...q.words].sort(()=>Math.random()-0.5));} if(q&&q.type==='pairs'){setExPairDone({});setExPairShuffled(q.pairs?[...q.pairs].sort(()=>Math.random()-0.5):[]);} },[exIdx,exQuestions]);
+  useEffect(()=>{
+    const q=exQuestions[exIdx];
+    if(q&&q.type==='arrange'&&q.words){
+      // ── GOAL 2: بناء WordBankState جديد لكل سؤال arrange ──
+      // يضمن shuffle عشوائي + IDs فريدة لكل كلمة (حتى المكررة)
+      setWbState(new WordBankState(q.words));
+      // إعادة تعيين المتغيرات القديمة للسلامة
+      setExArrWords([]); setExArrSel([]);
+    } else {
+      setWbState(null);
+    }
+    if(q&&q.type==='pairs'){setExPairDone({});setExPairShuffled(q.pairs?[...q.pairs].sort(()=>Math.random()-0.5):[]);}
+  },[exIdx,exQuestions]);
   useEffect(()=>{if(!challengeActive)return;const i=setInterval(()=>{setChallengeTime(t=>{if(t<=1){setChallengeActive(false);clearInterval(i);return 0;}return t-1;});if(Math.random()>0.6)setChallengeScore(s=>({...s,opp:s.opp+1}));},1000);return()=>clearInterval(i);},[challengeActive]);
 
   // ── WebRTC refs ───────────────────────────────────────────────────────────
@@ -2680,8 +2833,6 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
 
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
   const now=()=>new Date().toLocaleTimeString("ar",{hour:"2-digit",minute:"2-digit"});
-
-  const Av=({src,size=40})=>(<div style={{width:size,height:size,borderRadius:size/2,overflow:"hidden",flexShrink:0,border:`2px solid ${primary}`,background:card,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 0 3px ${glow}`}}>{src?.startsWith("http")?<img src={src} style={{width:"100%",height:"100%",objectFit:"cover"}} alt="" loading="lazy"/>:<span style={{fontSize:size*0.55,lineHeight:1}}>{src}</span>}</div>);
 
   const CSS=`
     @keyframes fadeUp{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -3357,7 +3508,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
         }}>
           <button onClick={()=>setScreen("home")} style={{background:"none",border:"none",cursor:"pointer",padding:6}}>{Ic.back(muted)}</button>
           <button onClick={()=>setShowPartnerR(true)} style={{background:"none",border:"none",cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:10,flex:1}}>
-            <Av src={partner.av} size={36}/>
+            <Av src={partner.av} size={36} primary={primary} card={card} glow={glow}/>
             <div style={{flex:1,textAlign:"right"}}>
               <div style={{fontWeight:800,fontSize:15}}>{partner.name}</div>
               <div style={{fontSize:11,color:isTyping?"#22c55e":muted,display:"flex",alignItems:"center",gap:4}}>
@@ -3802,7 +3953,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
             ? <button onClick={()=>setTab("home")} style={{background:"none",border:"none",cursor:"pointer",padding:"6px",display:"flex",alignItems:"center",gap:4,color:muted}}>
                 {Ic.back(muted,20)}
               </button>
-            : <button onClick={()=>setShowProfileView(true)} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><Av src={profile.avatar} size={40}/></button>
+            : <button onClick={()=>setShowProfileView(true)} style={{background:"none",border:"none",cursor:"pointer",padding:0}}><Av src={profile.avatar} size={40} primary={primary} card={card} glow={glow}/></button>
           }
           <div style={{
             fontWeight:900,fontSize:20,letterSpacing:0.5,
@@ -3899,7 +4050,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
             <div style={{display:"flex",alignItems:"center",gap:14}}>
               <div style={{position:"relative"}}>
                 <div style={{width:58,height:58,borderRadius:29,padding:2,background:`linear-gradient(135deg,${primary},${secondary})`,boxShadow:`0 0 20px ${glow}`}}>
-                  <Av src={profile.avatar} size={54}/>
+                  <Av src={profile.avatar} size={54} primary={primary} card={card} glow={glow}/>
                 </div>
                 <div style={{position:"absolute",bottom:0,right:0,width:14,height:14,borderRadius:7,background:"#22c55e",border:`2px solid ${darkMode?"#0b1120":"white"}`,boxShadow:"0 0 8px rgba(34,197,94,0.5)"}}/>
               </div>
@@ -5391,7 +5542,13 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
             })()}
 
             {/* ── STEP 1: اختيار اللغة ── */}
-            {exStep==="lang"&&<>
+            {exStep==="lang"&&exLoading&&(
+              <div style={{...glass({textAlign:"center",padding:40,marginBottom:14})}}>
+                <div style={{fontSize:40,animation:"spin 1s linear infinite",marginBottom:12}}>⟳</div>
+                <div style={{color:muted,fontSize:13}}>جاري تحضير التمارين... 🤔</div>
+              </div>
+            )}
+            {exStep==="lang"&&!exLoading&&<>
               <div style={{fontWeight:800,fontSize:15,marginBottom:14,display:"flex",alignItems:"center",gap:6}}>{Ic.star(primary,16)}<span>اختر اللغة التي تريد تعلمها</span></div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                 {LANGS_EX.map(l=>{
@@ -5479,6 +5636,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
                 setTimeout(()=>{
                   setExAnswer(null); setExArrWords([]); setExArrSel([]);
                   setExPairSel(null); setExPairDone({}); setExClozeInput(""); setExCardFlipped(false);
+                  setWbState(null); setWbGrading(false); // ── مسح حالة بنك الكلمات بين الأسئلة ──
                   if(isLast){
                     const newScore=(exScore+(correct?1:0));
                     const topicKey=exLang.code+"_"+exTopic?.key;
@@ -5530,7 +5688,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
               return(<>
                 {/* Header */}
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
-                  <button onClick={()=>{setExStep("lang");setExAnswer(null);setExArrWords([]);setExArrSel([]);setExPairSel(null);setExPairDone({});setExClozeInput("");setExCardFlipped(false);}} style={{background:"none",border:"none",cursor:"pointer",color:muted,fontSize:13,display:"flex",alignItems:"center",gap:4,fontFamily:"'Poppins','Tajawal',system-ui"}}>{Ic.back(muted,16)} رجوع</button>
+                  <button onClick={()=>{setExStep("lang");setExAnswer(null);setExArrWords([]);setExArrSel([]);setExPairSel(null);setExPairDone({});setExClozeInput("");setExCardFlipped(false);setWbState(null);setWbGrading(false);}} style={{background:"none",border:"none",cursor:"pointer",color:muted,fontSize:13,display:"flex",alignItems:"center",gap:4,fontFamily:"'Poppins','Tajawal',system-ui"}}>{Ic.back(muted,16)} رجوع</button>
                   <button onClick={()=>{
                     setExStep("lang");
                     setOnbLang(userPreferences?.lang||"");
@@ -5555,7 +5713,7 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
 
                   {/* ── MCQ ── */}
                   {(!q.type||q.type==="mcq")&&<>
-                    <div style={{color:muted,fontSize:12,marginBottom:8,textAlign:"center"}}><TapText text={q.q} style={{color:muted,fontSize:12}}/></div>
+                    <div style={{color:muted,fontSize:12,marginBottom:8,textAlign:"center"}}><TapText text={q.q} style={{color:muted,fontSize:12}} onWordTap={handleWordTap} primary={primary}/></div>
                     <div style={{fontWeight:900,fontSize:30,background:`linear-gradient(135deg,${primary},${accent})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",marginBottom:20,textAlign:"center",cursor:"pointer"}} onClick={e=>handleWordTap(q.word,e)}>{q.word}</div>
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                       {q.options?.map((o,i)=>{
@@ -5566,33 +5724,127 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
                     </div>
                   </>}
 
-                  {/* ── ARRANGE ── */}
+                  {/* ── ARRANGE (Word Bank Engine) ── */}
                   {q.type==="arrange"&&(()=>{
+                    // ── GOAL 2: استخدام WordBankState بالكامل هنا ──
+                    // إذا لم يُبنَ wbState بعد (أول render) نعود لعرض بسيط
+                    if(!wbState) return <div style={{color:muted,fontSize:12,textAlign:"center"}}>جاري التحميل...</div>;
+
                     const maxWords=(q.answer||"").split(" ").filter(Boolean).length;
-                    const isFull=exArrSel.length>=maxWords;
+                    // isFull: تُعطَّل أزرار البنك عند اكتمال منطقة الإجابة
+                    const isFull=wbState.answerTokens.length>=maxWords;
+
+                    // ── toggleToken: دالة واحدة تتحكم بالبنك ومنطقة الإجابة ──
+                    const handleTokenClick=(tokenId)=>{
+                      // لا نسمح بالنقر بعد صدور الحكم
+                      if(exAnswer!==null) return;
+                      // لا نسمح بإضافة المزيد إذا اكتملت الإجابة وكانت الكلمة في البنك
+                      const token=wbState.tokens.find(t=>t.id===tokenId);
+                      if(!token) return;
+                      if(!token.isSelected && isFull) return; // البنك ممتلئ — أزل كلمة أولاً
+                      setWbState(prev=>prev.toggleToken(tokenId));
+                    };
+
                     return(<>
-                    <div style={{color:muted,fontSize:12,marginBottom:8,textAlign:"center"}}>{q.q}</div>
-                    <div style={{color:muted,fontSize:11,textAlign:"center",marginBottom:10}}>{exArrSel.length} / {maxWords} كلمة</div>
-                    <div style={{minHeight:48,background:"rgba(128,128,128,0.1)",borderRadius:12,padding:8,marginBottom:12,display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center",border:`1px solid ${isFull?primary:border}`,direction:"ltr",transition:"border-color 0.2s"}}>
-                      {(exArrSel.length===0?[]:exArrSel).map((w,i)=>(
-                        <button key={i} onClick={()=>{setExArrSel(s=>s.filter((_,j)=>j!==i));setExArrWords(w2=>[...w2,w]);}} style={{background:`linear-gradient(135deg,${primary},${secondary})`,color:"white",border:"none",borderRadius:8,padding:"6px 12px",fontSize:13,cursor:"pointer",fontFamily:"'Poppins','Tajawal',system-ui"}}>{w}</button>
-                      ))}
-                      {exArrSel.length===0&&<span style={{color:muted,fontSize:12,lineHeight:"36px"}}>اضغط الكلمات بالترتيب...</span>}
-                    </div>
-                    <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:12,direction:"ltr"}}>
-                      {(exArrWords.length>0?exArrWords:(q.words||[]).slice().sort(()=>Math.random()-0.5)).map((w,i)=>(
-                        <button key={i} onClick={()=>{if(isFull)return;setExArrSel(s=>[...s,w]);setExArrWords(w2=>w2.filter((_,j)=>j!==i));}}
-                          style={{background:isFull?"rgba(128,128,128,0.08)":card,border:`1px solid ${isFull?"transparent":border}`,borderRadius:8,padding:"8px 14px",fontSize:13,cursor:isFull?"not-allowed":"pointer",color:isFull?muted:text,fontFamily:"'Poppins','Tajawal',system-ui",opacity:isFull?0.4:1,transition:"all 0.2s"}}>{w}</button>
-                      ))}
-                    </div>
-                    {exAnswer==="wrong"&&<div style={{color:"#ef4444",fontSize:12,textAlign:"center",marginBottom:8}}>الإجابة الصحيحة: {q.answer}</div>}
-                    {exAnswer==="correct"&&<div style={{color:"#22c55e",fontSize:12,textAlign:"center",marginBottom:8}}>✅ ممتاز!</div>}
-                    <button onClick={()=>{
-                      if(exArrSel.length===0) return;
-                      const ok=exArrSel.join(" ")===q.answer;
-                      setExAnswer(ok?"correct":"wrong");
-                      goNext(ok);
-                    }} style={btnP({width:"100%",opacity:exArrSel.length===0?0.5:1})}>تحقق ✓</button>
+                      <div style={{color:muted,fontSize:12,marginBottom:8,textAlign:"center"}}>{q.q}</div>
+                      <div style={{color:muted,fontSize:11,textAlign:"center",marginBottom:10}}>
+                        {wbState.answerTokens.length} / {maxWords} كلمة
+                      </div>
+
+                      {/* ── منطقة الإجابة (Answer Zone) ── */}
+                      <div style={{minHeight:48,background:"rgba(128,128,128,0.1)",borderRadius:12,padding:8,marginBottom:12,display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center",border:`1px solid ${isFull?primary:border}`,direction:"ltr",transition:"border-color 0.2s"}}>
+                        {wbState.answerTokens.length===0
+                          ? <span style={{color:muted,fontSize:12,lineHeight:"36px"}}>اضغط الكلمات بالترتيب...</span>
+                          // كل token له id فريد — لا مشكلة مع الكلمات المكررة
+                          : wbState.answerTokens.map(tok=>(
+                            <button key={tok.id} onClick={()=>handleTokenClick(tok.id)}
+                              style={{background:`linear-gradient(135deg,${primary},${secondary})`,color:"white",border:"none",borderRadius:8,padding:"6px 12px",fontSize:13,cursor:"pointer",fontFamily:"'Poppins','Tajawal',system-ui",transition:"transform 0.1s"}}>
+                              {tok.word}
+                            </button>
+                          ))
+                        }
+                      </div>
+
+                      {/* ── بنك الكلمات (Word Bank) ── */}
+                      <div style={{display:"flex",flexWrap:"wrap",gap:8,justifyContent:"center",marginBottom:12,direction:"ltr"}}>
+                        {wbState.bankTokens.map(tok=>(
+                          <button key={tok.id} onClick={()=>handleTokenClick(tok.id)}
+                            style={{background:isFull?"rgba(128,128,128,0.08)":card,border:`1px solid ${isFull?"transparent":border}`,borderRadius:8,padding:"8px 14px",fontSize:13,cursor:isFull?"not-allowed":"pointer",color:isFull?muted:text,fontFamily:"'Poppins','Tajawal',system-ui",opacity:isFull?0.4:1,transition:"all 0.2s"}}>
+                            {tok.word}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* ── نتيجة التحقق ── */}
+                      {exAnswer==="wrong"&&<div style={{color:"#ef4444",fontSize:12,textAlign:"center",marginBottom:8}}>الإجابة الصحيحة: {q.answer}</div>}
+                      {exAnswer==="correct"&&<div style={{color:"#22c55e",fontSize:12,textAlign:"center",marginBottom:8}}>✅ ممتاز!</div>}
+
+                      {/* ── GOAL 3: زر التحقق يستدعي Edge Function grade-answer ── */}
+                      <button
+                        disabled={wbState.answerTokens.length===0 || wbGrading || exAnswer!==null}
+                        onClick={async()=>{
+                          if(wbState.answerTokens.length===0 || wbGrading || exAnswer!==null) return;
+
+                          // ── بناء الإجابة بـ TextNormalizer ──
+                          // نستخدم getConstructedAnswer() من WordBankState
+                          const rawAnswer = wbState.getConstructedAnswer();
+
+                          // ── GOAL 3: إرسال challenge_id + user_answer فقط ──
+                          // لا نُرسل الإجابة الصحيحة ولا نُقيّم محلياً
+                          setWbGrading(true);
+                          let isCorrect = false;
+                          try {
+                            const supa = getSupa();
+                            if(!supa) throw new Error("Supabase not initialised");
+
+                            const resp = await fetch(
+                              `${_SUPA_URL}/functions/v1/grade-answer`,
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  // المصادقة الآمنة: مفتاح anon يُرسَل دائماً
+                                  "apikey": _SUPA_KEY,
+                                  "Authorization": `Bearer ${_SUPA_KEY}`
+                                },
+                                body: JSON.stringify({
+                                  // challenge_id: معرّف السؤال من Supabase (أو الكلمة كمعرّف بديل)
+                                  challenge_id: q.id || q.word || `${exLang?.code}_${q.q}`,
+                                  // user_answer: النص المُركَّب من بنك الكلمات مُنظَّفاً
+                                  user_answer: TextNormalizer.clean(rawAnswer, exLang?.code || 'en')
+                                })
+                              }
+                            );
+
+                            if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                            const data = await resp.json();
+                            // Edge Function تُعيد { correct: boolean }
+                            isCorrect = data.correct === true;
+
+                          } catch(err) {
+                            // ── Fallback محلي آمن عند فشل الشبكة أو غياب Edge Function ──
+                            // يستخدم TextNormalizer لضمان مقارنة عادلة (تجاهل الحالة والترقيم)
+                            console.warn("grade-answer edge function failed, using local fallback:", err.message);
+                            isCorrect = TextNormalizer.clean(rawAnswer, exLang?.code||'en')
+                                     === TextNormalizer.clean(q.answer||"", exLang?.code||'en');
+                          } finally {
+                            setWbGrading(false);
+                          }
+
+                          // تحديث واجهة النتيجة بناءً على ردّ الـ Edge Function
+                          setExAnswer(isCorrect?"correct":"wrong");
+                          goNext(isCorrect);
+                        }}
+                        style={btnP({width:"100%",opacity:(wbState.answerTokens.length===0||wbGrading||exAnswer!==null)?0.5:1})}>
+                        {wbGrading
+                          // حالة التحميل أثناء انتظار Edge Function
+                          ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+                              <div style={{width:14,height:14,borderRadius:7,border:"2px solid rgba(255,255,255,0.4)",borderTopColor:"white",animation:"spin 0.7s linear infinite"}}/>
+                              جاري التحقق...
+                            </span>
+                          : "تحقق ✓"
+                        }
+                      </button>
                     </>);
                   })()}
 
@@ -5902,86 +6154,13 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
           </>}
 
           {/* FIX 8: Community Questions Button */}
-          {!storeTab&&exStep==="lang"&&(()=>{
-            const[showCQ,setShowCQ]=React.useState(false);
-            const[cqForm,setCqForm]=React.useState({lang:"English",topic:"travel",qtype:"mcq",question:"",options:"",answer:"0",translation:""});
-            const[cqSending,setCqSending]=React.useState(false);
-            const[cqDone,setCqDone]=React.useState(false);
-            return(<>
-              <button onClick={()=>setShowCQ(true)} style={{...glass({width:"100%",padding:"12px 16px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginTop:4,border:`1px solid ${primary}30`,background:`${primary}08`})}}>
-                <span style={{fontSize:20}}>✏️</span>
-                <div style={{flex:1,textAlign:"right"}}>
-                  <div style={{fontWeight:700,fontSize:13}}>ساهم بسؤال</div>
-                  <div style={{color:muted,fontSize:11,marginTop:2}}>أضف سؤالاً لمساعدة المتعلمين الآخرين</div>
-                </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-              {showCQ&&(
-                <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)",zIndex:200,display:"flex",alignItems:"flex-end"}} onClick={()=>setShowCQ(false)}>
-                  <div style={{...glass({width:"100%",borderRadius:"24px 24px 0 0",padding:22,maxHeight:"80vh",overflowY:"auto"})}} onClick={e=>e.stopPropagation()}>
-                    <div style={{fontWeight:900,fontSize:16,marginBottom:16,color:primary}}>✏️ أضف سؤالاً جديداً</div>
-                    {cqDone?(
-                      <div style={{textAlign:"center",padding:"20px 0"}}>
-                        <div style={{fontSize:48,marginBottom:12}}>✅</div>
-                        <div style={{fontWeight:800,fontSize:16,marginBottom:8}}>شكراً على مساهمتك!</div>
-                        <div style={{color:muted,fontSize:13}}>سيُراجع السؤال ويُضاف للتطبيق قريباً</div>
-                        <button onClick={()=>{setShowCQ(false);setCqDone(false);}} style={btnP({marginTop:16,padding:"12px 28px"})}>إغلاق</button>
-                      </div>
-                    ):(
-                      <>
-                        {[
-                          {label:"اللغة",field:"lang",type:"select",options:["English","Arabic","French","Spanish","German","Chinese","Japanese","Turkish"]},
-                          {label:"الموضوع",field:"topic",type:"select",options:["travel","food","music","school","work","family","sports","shopping","health","technology","nature","daily"]},
-                          {label:"نوع السؤال",field:"qtype",type:"select",options:["mcq","flashcard","cloze","arrange","speech"]},
-                          {label:"السؤال / الكلمة",field:"question",type:"text",placeholder:"مثال: What is the meaning of 'Hello'?"},
-                          {label:"الخيارات (مفصولة بفاصلة)",field:"options",type:"text",placeholder:"مرحبا, وداعا, شكرا, آسف"},
-                          {label:"رقم الإجابة الصحيحة (0-3)",field:"answer",type:"text",placeholder:"0"},
-                          {label:"الترجمة / المعنى",field:"translation",type:"text",placeholder:"مرحباً"},
-                        ].map(f=>(
-                          <div key={f.field} style={{marginBottom:12}}>
-                            <div style={{fontSize:12,color:muted,marginBottom:4,fontWeight:600}}>{f.label}</div>
-                            {f.type==="select"?(
-                              <select value={cqForm[f.field]} onChange={e=>setCqForm(p=>({...p,[f.field]:e.target.value}))}
-                                style={{width:"100%",padding:"10px 12px",borderRadius:10,background:darkMode?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.04)",border:`1px solid ${border}`,color:text,fontSize:13,outline:"none",fontFamily:"'Poppins','Tajawal',system-ui"}}>
-                                {f.options.map(o=><option key={o} value={o}>{o}</option>)}
-                              </select>
-                            ):(
-                              <input value={cqForm[f.field]} onChange={e=>setCqForm(p=>({...p,[f.field]:e.target.value}))}
-                                placeholder={f.placeholder} style={{width:"100%",padding:"10px 12px",borderRadius:10,background:darkMode?"rgba(255,255,255,0.06)":"rgba(0,0,0,0.04)",border:`1px solid ${border}`,color:text,fontSize:13,outline:"none",fontFamily:"'Poppins','Tajawal',system-ui"}}/>
-                            )}
-                          </div>
-                        ))}
-                        <button onClick={async()=>{
-                          if(!cqForm.question.trim()){alert("اكتب السؤال أولاً");return;}
-                          setCqSending(true);
-                          try{
-                            const supa=getSupa();
-                            if(supa){
-                              const optArr=cqForm.options.split(",").map(s=>s.trim()).filter(Boolean);
-                              await supa.from("pending_questions").insert({
-                                language:cqForm.lang,category:cqForm.topic,type:cqForm.qtype,
-                                question_text:cqForm.question,options_text:cqForm.options,
-                                correct_answer:parseInt(cqForm.answer)||0,
-                                translation:cqForm.translation,
-                                submitted_by:userId||"anonymous",
-                                status:"pending",
-                                created_at:new Date().toISOString()
-                              });
-                              setCqDone(true);
-                              addXp(10,"مساهمة مجتمعية");
-                            }
-                          }catch(e){ alert("حدث خطأ، حاول مجدداً"); }
-                          setCqSending(false);
-                        }} style={btnP({width:"100%",opacity:cqSending?0.7:1})}>
-                          {cqSending?"جاري الإرسال...":"إرسال السؤال 📤"}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>);
-          })()}
+          {!storeTab&&exStep==="lang"&&(
+            <CommunityQuestion
+              primary={primary} border={border} muted={muted} text={text}
+              darkMode={darkMode} btnP={btnP} glass={glass}
+              getSupa={getSupa} userId={userId} addXp={addXp}
+            />
+          )}
         </div>}
 
         {/* LEADERBOARD */}
@@ -6203,7 +6382,9 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
                 <div>
                   <div style={{fontWeight:900,fontSize:16,background:"linear-gradient(135deg,#f59e0b,#fbbf24)",
                     WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Admin Panel</div>
-                  <div style={{fontSize:11,color:muted}}>Gemini API → Supabase Secrets</div>
+                  <div style={{fontSize:11,color:muted}}>
+                    {adminAiProvider==="groq"?"Groq ⚡ — LLaMA 3.3 70B":"Gemini 🔮 — Edge Function"}
+                  </div>
                 </div>
               </div>
               <button onClick={()=>setShowAdmin(false)}
@@ -6211,11 +6392,52 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
                   border:"none",cursor:"pointer",color:muted,fontSize:18}}>✕</button>
             </div>
 
+            {/* AI Provider Selector */}
+            <div style={{...glass({marginBottom:14,padding:14,border:`1px solid rgba(255,255,255,0.08)`})}}>
+              <div style={{fontSize:11,color:muted,fontWeight:700,marginBottom:10,
+                letterSpacing:"0.04em",textTransform:"uppercase"}}>🤖 محرك الذكاء الاصطناعي</div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>setAdminAiProvider("groq")} style={{
+                  flex:1,padding:"12px 8px",borderRadius:14,cursor:"pointer",textAlign:"center",
+                  border:`1.5px solid ${adminAiProvider==="groq"?"#22d3ee":"rgba(255,255,255,0.08)"}`,
+                  background:adminAiProvider==="groq"?"rgba(34,211,238,0.12)":"rgba(255,255,255,0.03)",
+                  transition:"all 0.2s",fontFamily:"'Poppins','Tajawal',system-ui"}}>
+                  <div style={{fontSize:20,marginBottom:3}}>⚡</div>
+                  <div style={{fontSize:12,fontWeight:800,
+                    color:adminAiProvider==="groq"?"#22d3ee":"rgba(255,255,255,0.35)"}}>Groq</div>
+                  <div style={{fontSize:9,color:muted,marginTop:1}}>LLaMA 3.3 — أسرع</div>
+                </button>
+                <button onClick={()=>setAdminAiProvider("gemini")} style={{
+                  flex:1,padding:"12px 8px",borderRadius:14,cursor:"pointer",textAlign:"center",
+                  border:`1.5px solid ${adminAiProvider==="gemini"?"#818cf8":"rgba(255,255,255,0.08)"}`,
+                  background:adminAiProvider==="gemini"?"rgba(99,102,241,0.18)":"rgba(255,255,255,0.03)",
+                  transition:"all 0.2s",fontFamily:"'Poppins','Tajawal',system-ui"}}>
+                  <div style={{fontSize:20,marginBottom:3}}>🔮</div>
+                  <div style={{fontSize:12,fontWeight:800,
+                    color:adminAiProvider==="gemini"?"#818cf8":"rgba(255,255,255,0.35)"}}>Gemini</div>
+                  <div style={{fontSize:9,color:muted,marginTop:1}}>Edge Function</div>
+                </button>
+              </div>
+              {adminAiProvider==="groq"&&(
+                <div style={{marginTop:8,padding:"6px 12px",borderRadius:10,
+                  background:"rgba(34,211,238,0.07)",border:"1px solid rgba(34,211,238,0.2)",
+                  fontSize:10,color:"#67e8f9",display:"flex",alignItems:"center",gap:6}}>
+                  ⚡ Groq يعمل مباشرة — لا يحتاج Edge Function — أسرع بكثير
+                </div>
+              )}
+            </div>
+
             {/* Section: Question Generator */}
             <div style={{...glass({marginBottom:14,padding:16,border:`1px solid rgba(99,102,241,0.3)`})}}>
               <div style={{fontWeight:800,fontSize:13,color:"#818cf8",marginBottom:12,
-                display:"flex",alignItems:"center",gap:6}}>
-                📚 مولّد الأسئلة (150 سؤال)
+                display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+                <span>📚 مولّد الأسئلة (150 سؤال)</span>
+                <span style={{fontSize:10,fontWeight:600,borderRadius:50,padding:"2px 8px",
+                  color:adminAiProvider==="groq"?"#22d3ee":"#818cf8",
+                  background:adminAiProvider==="groq"?"rgba(34,211,238,0.1)":"rgba(99,102,241,0.1)",
+                  border:`1px solid ${adminAiProvider==="groq"?"rgba(34,211,238,0.3)":"rgba(99,102,241,0.3)"}`}}>
+                  {adminAiProvider==="groq"?"⚡ Groq":"🔮 Gemini"}
+                </span>
               </div>
 
               {/* Language picker */}
@@ -6239,18 +6461,28 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
                 onClick={()=>{ if(!adminGenLoading) adminGenerateQuestions(); }}
                 disabled={adminGenLoading}
                 style={{...btnP({width:"100%",fontSize:13,
-                  background:"linear-gradient(135deg,#6366f1,#8b5cf6)",
+                  background:adminAiProvider==="groq"
+                    ?"linear-gradient(135deg,#0891b2,#22d3ee)"
+                    :"linear-gradient(135deg,#6366f1,#8b5cf6)",
                   opacity:adminGenLoading?0.6:1})}}
               >
-                {adminGenLoading?"⏳ جارٍ التوليد...":"⚡ توليد 150 سؤال"}
+                {adminGenLoading
+                  ?`⏳ جارٍ التوليد عبر ${adminAiProvider==="groq"?"Groq":"Gemini"}...`
+                  :`⚡ توليد 150 سؤال — ${adminAiProvider==="groq"?"Groq":"Gemini"}`}
               </button>
             </div>
 
             {/* Section: Sticker Generators */}
             <div style={{...glass({marginBottom:14,padding:16,border:`1px solid rgba(245,158,11,0.3)`})}}>
               <div style={{fontWeight:800,fontSize:13,color:"#fbbf24",marginBottom:12,
-                display:"flex",alignItems:"center",gap:6}}>
-                🎭 مولّد الستيكرات
+                display:"flex",alignItems:"center",justifyContent:"space-between",gap:6}}>
+                <span>🎭 مولّد الستيكرات</span>
+                <span style={{fontSize:10,fontWeight:600,borderRadius:50,padding:"2px 8px",
+                  color:adminAiProvider==="groq"?"#22d3ee":"#818cf8",
+                  background:adminAiProvider==="groq"?"rgba(34,211,238,0.1)":"rgba(99,102,241,0.1)",
+                  border:`1px solid ${adminAiProvider==="groq"?"rgba(34,211,238,0.3)":"rgba(99,102,241,0.3)"}`}}>
+                  {adminAiProvider==="groq"?"⚡ Groq":"🔮 Gemini"}
+                </span>
               </div>
               <div style={{display:"flex",gap:8}}>
                 <button
@@ -6274,7 +6506,6 @@ ${reviewWords?`راجع هذه الكلمات أيضاً: ${reviewWords}`:""}`;
                   🌙 حكمة عربية
                 </button>
               </div>
-              {/* FIX 12: Status Expressions Pack */}
               <div style={{marginTop:8}}>
                 <button
                   onClick={()=>{ if(!adminGenLoading) adminGenerateStickers("status"); }}
